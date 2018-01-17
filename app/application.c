@@ -1,6 +1,7 @@
 #include <application.h>
 #include <bc_eeprom.h>
 #include <bc_spi.h>
+#include <bc_dice.h>
 
 #define BATTERY_UPDATE_INTERVAL (60 * 60 * 1000)
 
@@ -25,10 +26,10 @@ static event_param_t temperature_event_param = { .next_pub = 0, .value = NAN };
 static event_param_t temperature_set_point;
 static float temperature_on_display;
 
-static bc_module_lcd_rotation_t rotation;
-
 static bc_lis2dh12_t lis2dh12;
-static bc_lis2dh12_result_g_t result;
+static bc_dice_t dice;
+static bc_dice_face_t face = BC_DICE_FACE_UNKNOWN;
+static bc_module_lcd_rotation_t rotation = BC_MODULE_LCD_ROTATION_0;
 
 void radio_pub_set_temperature(void)
 {
@@ -126,38 +127,48 @@ void lis2dh12_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void
 
     if (event == BC_LIS2DH12_EVENT_UPDATE)
     {
+        bc_lis2dh12_result_g_t result;
+
         bc_lis2dh12_get_result_g(self, &result);
 
-        if ((result.z_axis > 0) && result.z_axis < 0.90)
-        {
+        bc_dice_feed_vectors(&dice, result.x_axis, result.y_axis, result.z_axis);
 
-            if (fabs(result.x_axis) > fabs(result.y_axis))
+        if (face != bc_dice_get_face(&dice))
+        {
+            face = bc_dice_get_face(&dice);
+
+            switch (face)
             {
-                if (result.x_axis > 0)
+                case BC_DICE_FACE_2:
                 {
                     rotation = BC_MODULE_LCD_ROTATION_90;
+                    break;
                 }
-                else
-                {
-                    rotation = BC_MODULE_LCD_ROTATION_270;
-                }
-            }
-            else
-            {
-                if (result.y_axis > 0)
+                case BC_DICE_FACE_3:
                 {
                     rotation = BC_MODULE_LCD_ROTATION_0;
+                    break;
                 }
-                else
+                case BC_DICE_FACE_4:
                 {
                     rotation = BC_MODULE_LCD_ROTATION_180;
+                    break;
+                }
+                case BC_DICE_FACE_5:
+                {
+                    rotation = BC_MODULE_LCD_ROTATION_270;
+                    break;
+                }
+                case BC_DICE_FACE_1:
+                case BC_DICE_FACE_6:
+                case BC_DICE_FACE_UNKNOWN:
+                default:
+                {
+                    break;
                 }
             }
 
-            if (rotation != bc_module_lcd_get_rotation())
-            {
-                bc_scheduler_plan_now(APPLICATION_TASK_ID);
-            }
+            bc_scheduler_plan_now(APPLICATION_TASK_ID);
         }
     }
 }
@@ -227,6 +238,7 @@ void application_init(void)
     bc_led_init_virtual(&led_lcd_blue, BC_MODULE_LCD_LED_BLUE, bc_module_lcd_get_led_driver(), true);
 
     // Initialize Accelerometer
+    bc_dice_init(&dice, BC_DICE_FACE_UNKNOWN);
     bc_lis2dh12_init(&lis2dh12, BC_I2C_I2C0, 0x19);
     bc_lis2dh12_set_update_interval(&lis2dh12, 100);
     bc_lis2dh12_set_event_handler(&lis2dh12, lis2dh12_event_handler, NULL);
@@ -245,7 +257,7 @@ void application_task(void)
     	return;
     }
 
-    bc_module_core_pll_enable();
+    bc_system_pll_enable();
 
     bc_module_lcd_set_rotation(rotation);
 
@@ -267,5 +279,5 @@ void application_task(void)
 
     bc_module_lcd_update();
 
-    bc_module_core_pll_disable();
+    bc_system_pll_disable();
 }
