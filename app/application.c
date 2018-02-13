@@ -3,11 +3,13 @@
 #include <bc_spi.h>
 #include <bc_dice.h>
 
+#define SERVICE_INTERVAL_INTERVAL (60 * 60 * 1000)
 #define BATTERY_UPDATE_INTERVAL (60 * 60 * 1000)
 
 #define TEMPERATURE_TAG_PUB_NO_CHANGE_INTEVAL (15 * 60 * 1000)
 #define TEMPERATURE_TAG_PUB_VALUE_CHANGE 0.2f
-#define TEMPERATURE_TAG_UPDATE_INTERVAL (1 * 1000)
+#define TEMPERATURE_UPDATE_SERVICE_INTERVAL (5 * 1000)
+#define TEMPERATURE_UPDATE_NORMAL_INTERVAL (10 * 1000)
 
 #define SET_TEMPERATURE_PUB_INTERVAL 15 * 60 * 1000;
 #define SET_TEMPERATURE_ADD_ON_CLICK 0.5f
@@ -17,19 +19,20 @@
 
 #define COLOR_BLACK true
 
-static bc_led_t led;
-static bc_led_t led_lcd_red;
-static bc_led_t led_lcd_blue;
+bc_led_t led;
+bc_led_t led_lcd_red;
+bc_led_t led_lcd_blue;
 
-static bc_tag_temperature_t temperature;
-static event_param_t temperature_event_param = { .next_pub = 0, .value = NAN };
-static event_param_t temperature_set_point;
-static float temperature_on_display;
+// Thermometer instance
+bc_tmp112_t tmp112;
+event_param_t temperature_event_param = { .next_pub = 0, .value = NAN };
+event_param_t temperature_set_point;
+float temperature_on_display = NAN;
 
-static bc_lis2dh12_t lis2dh12;
-static bc_dice_t dice;
-static bc_dice_face_t face = BC_DICE_FACE_UNKNOWN;
-static bc_module_lcd_rotation_t rotation = BC_MODULE_LCD_ROTATION_0;
+bc_lis2dh12_t lis2dh12;
+bc_dice_t dice;
+bc_dice_face_t face = BC_DICE_FACE_UNKNOWN;
+bc_module_lcd_rotation_t rotation = BC_MODULE_LCD_ROTATION_0;
 
 void radio_pub_set_temperature(void)
 {
@@ -38,19 +41,19 @@ void radio_pub_set_temperature(void)
     bc_radio_pub_temperature(BC_RADIO_PUB_CHANNEL_SET_POINT, &temperature_set_point.value);
 }
 
-void temperature_tag_event_handler(bc_tag_temperature_t *self, bc_tag_temperature_event_t event, void *event_param)
+void tmp112_event_handler(bc_tmp112_t *self, bc_tmp112_event_t event, void *event_param)
 {
     float value;
     event_param_t *param = (event_param_t *)event_param;
 
-    if (event != BC_TAG_TEMPERATURE_EVENT_UPDATE)
+    if (event != BC_TMP112_EVENT_UPDATE)
     {
         return;
     }
 
-    if (bc_tag_temperature_get_temperature_celsius(self, &value))
+    if (bc_tmp112_get_temperature_celsius(self, &value))
     {
-        if ((fabs(value - param->value) >= TEMPERATURE_TAG_PUB_VALUE_CHANGE) || (param->next_pub < bc_scheduler_get_spin_tick()))
+        if ((fabsf(value - param->value) >= TEMPERATURE_TAG_PUB_VALUE_CHANGE) || (param->next_pub < bc_scheduler_get_spin_tick()))
         {
             bc_radio_pub_temperature(BC_RADIO_PUB_CHANNEL_R1_I2C0_ADDRESS_ALTERNATE, &value);
             param->value = value;
@@ -67,7 +70,7 @@ void temperature_tag_event_handler(bc_tag_temperature_t *self, bc_tag_temperatur
         radio_pub_set_temperature();
     }
 
-    if (param->value != temperature_on_display)
+    if ((fabsf(param->value - temperature_on_display) >= 0.1) || isnan(temperature_on_display))
     {
         bc_scheduler_plan_now(APPLICATION_TASK_ID);
     }
@@ -187,6 +190,13 @@ void battery_event_handler(bc_module_battery_event_t event, void *event_param)
 
 }
 
+void switch_to_normal_mode_task(void *param)
+{
+    bc_tmp112_set_update_interval(&tmp112, TEMPERATURE_UPDATE_NORMAL_INTERVAL);
+
+    bc_scheduler_unregister(bc_scheduler_get_current_task_id());
+}
+
 void application_init(void)
 {
     // Initialize LED on core module
@@ -215,10 +225,10 @@ void application_init(void)
     bc_module_battery_set_event_handler(battery_event_handler, NULL);
     bc_module_battery_set_update_interval(BATTERY_UPDATE_INTERVAL);
 
-    // Initialize temperature
-    bc_tag_temperature_init(&temperature, BC_I2C_I2C0, BC_TAG_TEMPERATURE_I2C_ADDRESS_ALTERNATE);
-    bc_tag_temperature_set_update_interval(&temperature, TEMPERATURE_TAG_UPDATE_INTERVAL);
-    bc_tag_temperature_set_event_handler(&temperature, temperature_tag_event_handler, &temperature_event_param);
+    // Initialize thermometer sensor on core module
+    bc_tmp112_init(&tmp112, BC_I2C_I2C0, 0x49);
+    bc_tmp112_set_event_handler(&tmp112, tmp112_event_handler, &temperature_event_param);
+    bc_tmp112_set_update_interval(&tmp112, TEMPERATURE_UPDATE_SERVICE_INTERVAL);
 
     // Initialize LCD
     bc_module_lcd_init(&_bc_module_lcd_framebuffer);
@@ -240,10 +250,12 @@ void application_init(void)
     // Initialize Accelerometer
     bc_dice_init(&dice, BC_DICE_FACE_UNKNOWN);
     bc_lis2dh12_init(&lis2dh12, BC_I2C_I2C0, 0x19);
-    bc_lis2dh12_set_update_interval(&lis2dh12, 100);
+    bc_lis2dh12_set_update_interval(&lis2dh12, 5 * 1000);
     bc_lis2dh12_set_event_handler(&lis2dh12, lis2dh12_event_handler, NULL);
 
     bc_radio_pairing_request("kit-lcd-thermostat", VERSION);
+
+    bc_scheduler_register(switch_to_normal_mode_task, NULL, SERVICE_INTERVAL_INTERVAL);
 
     bc_led_pulse(&led, 2000);
 }
