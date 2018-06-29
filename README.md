@@ -9,6 +9,14 @@
 
 This repository contains firmware for Thermostat Kit
 
+## Build
+
+For build with LCD rotation support use this commands
+
+        make clean
+        make -j4 ROTATE_SUPPORT=1
+
+
 ## License
 
 This project is licensed under the [MIT License](https://opensource.org/licenses/MIT/) - see the [LICENSE](LICENSE) file for details.

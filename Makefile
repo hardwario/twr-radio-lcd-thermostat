@@ -1,7 +1,9 @@
 SDK_DIR ?= sdk
 VERSION ?= vdev
+ROTATE_SUPPORT ?= 0
 
 CFLAGS += -D'VERSION="${VERSION}"'
+CFLAGS += -D'ROTATE_SUPPORT=${ROTATE_SUPPORT}'
 
 -include sdk/Makefile.mk
 

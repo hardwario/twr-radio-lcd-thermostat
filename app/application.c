@@ -29,10 +29,12 @@ event_param_t temperature_event_param = { .next_pub = 0, .value = NAN };
 event_param_t temperature_set_point;
 float temperature_on_display = NAN;
 
+#if ROTATE_SUPPORT
 bc_lis2dh12_t lis2dh12;
 bc_dice_t dice;
 bc_dice_face_t face = BC_DICE_FACE_UNKNOWN;
 bc_module_lcd_rotation_t rotation = BC_MODULE_LCD_ROTATION_0;
+#endif
 
 void radio_pub_set_temperature(void)
 {
@@ -76,54 +78,65 @@ void tmp112_event_handler(bc_tmp112_t *self, bc_tmp112_event_t event, void *even
     }
 }
 
-void lcd_button_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
+void on_lcd_button_click(void)
+{
+    radio_pub_set_temperature();
+
+    // Save set temperature to eeprom
+    uint32_t neg_set_temperature;
+    float *set_temperature = (float *) &neg_set_temperature;
+
+    *set_temperature = temperature_set_point.value;
+
+    neg_set_temperature = ~neg_set_temperature;
+
+    bc_eeprom_write(EEPROM_SET_TEMPERATURE_ADDRESS, &temperature_set_point.value, sizeof(temperature_set_point.value));
+    bc_eeprom_write(EEPROM_SET_TEMPERATURE_ADDRESS + sizeof(temperature_set_point.value), &neg_set_temperature, sizeof(neg_set_temperature));
+
+    bc_scheduler_plan_now(APPLICATION_TASK_ID);
+}
+
+void lcd_button_left_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
+{
+    if (event == BC_BUTTON_EVENT_CLICK)
+	{
+
+        temperature_set_point.value -= SET_TEMPERATURE_ADD_ON_CLICK;
+
+        static uint16_t left_event_count = 0;
+
+        left_event_count++;
+
+        bc_radio_pub_event_count(BC_RADIO_PUB_EVENT_LCD_BUTTON_LEFT, &left_event_count);
+
+        bc_led_pulse(&led_lcd_blue, 30);
+
+        on_lcd_button_click();
+    }
+}
+
+void lcd_button_right_event_handler(bc_button_t *self, bc_button_event_t event, void *event_param)
 {
     (void) event_param;
 
 	if (event == BC_BUTTON_EVENT_CLICK)
 	{
-        if (self->_channel.virtual_channel == BC_MODULE_LCD_BUTTON_LEFT)
-        {
-            temperature_set_point.value -= SET_TEMPERATURE_ADD_ON_CLICK;
 
-            static uint16_t left_event_count = 0;
+        temperature_set_point.value += SET_TEMPERATURE_ADD_ON_CLICK;
 
-            left_event_count++;
+        static uint16_t right_event_count = 0;
 
-            bc_radio_pub_event_count(BC_RADIO_PUB_EVENT_LCD_BUTTON_LEFT, &left_event_count);
+        right_event_count++;
 
-            bc_led_pulse(&led_lcd_blue, 30);
-        }
-        else
-        {
-            temperature_set_point.value += SET_TEMPERATURE_ADD_ON_CLICK;
+        bc_radio_pub_event_count(BC_RADIO_PUB_EVENT_LCD_BUTTON_RIGHT, &right_event_count);
 
-            static uint16_t right_event_count = 0;
+        bc_led_pulse(&led_lcd_red, 30);
 
-            right_event_count++;
-
-            bc_radio_pub_event_count(BC_RADIO_PUB_EVENT_LCD_BUTTON_RIGHT, &right_event_count);
-
-            bc_led_pulse(&led_lcd_red, 30);
-        }
-
-        radio_pub_set_temperature();
-
-        // Save set temperature to eeprom
-        uint32_t neg_set_temperature;
-        float *set_temperature = (float *) &neg_set_temperature;
-
-        *set_temperature = temperature_set_point.value;
-
-        neg_set_temperature = ~neg_set_temperature;
-
-        bc_eeprom_write(EEPROM_SET_TEMPERATURE_ADDRESS, &temperature_set_point.value, sizeof(temperature_set_point.value));
-        bc_eeprom_write(EEPROM_SET_TEMPERATURE_ADDRESS + sizeof(temperature_set_point.value), &neg_set_temperature, sizeof(neg_set_temperature));
-
-        bc_scheduler_plan_now(APPLICATION_TASK_ID);
-	}
+        on_lcd_button_click();
+    }
 }
 
+#if ROTATE_SUPPORT
 void lis2dh12_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void *event_param)
 {
     (void) event_param;
@@ -175,6 +188,7 @@ void lis2dh12_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void
         }
     }
 }
+#endif
 
 void battery_event_handler(bc_module_battery_event_t event, void *event_param)
 {
@@ -221,7 +235,7 @@ void application_init(void)
     bc_radio_init(BC_RADIO_MODE_NODE_SLEEPING);
 
     // Initialize battery
-    bc_module_battery_init(BC_MODULE_BATTERY_FORMAT_MINI);
+    bc_module_battery_init();
     bc_module_battery_set_event_handler(battery_event_handler, NULL);
     bc_module_battery_set_update_interval(BATTERY_UPDATE_INTERVAL);
 
@@ -231,27 +245,29 @@ void application_init(void)
     bc_tmp112_set_update_interval(&tmp112, TEMPERATURE_UPDATE_SERVICE_INTERVAL);
 
     // Initialize LCD
-    bc_module_lcd_init(&_bc_module_lcd_framebuffer);
+    bc_module_lcd_init();
 
     // Initialize LCD button left
     static bc_button_t lcd_left;
     bc_button_init_virtual(&lcd_left, BC_MODULE_LCD_BUTTON_LEFT, bc_module_lcd_get_button_driver(), false);
-    bc_button_set_event_handler(&lcd_left, lcd_button_event_handler, NULL);
+    bc_button_set_event_handler(&lcd_left, lcd_button_left_event_handler, NULL);
 
     // Initialize LCD button right
     static bc_button_t lcd_right;
     bc_button_init_virtual(&lcd_right, BC_MODULE_LCD_BUTTON_RIGHT, bc_module_lcd_get_button_driver(), false);
-    bc_button_set_event_handler(&lcd_right, lcd_button_event_handler, NULL);
+    bc_button_set_event_handler(&lcd_right, lcd_button_right_event_handler, NULL);
 
     // Initialize red and blue LED on LCD module
     bc_led_init_virtual(&led_lcd_red, BC_MODULE_LCD_LED_RED, bc_module_lcd_get_led_driver(), true);
     bc_led_init_virtual(&led_lcd_blue, BC_MODULE_LCD_LED_BLUE, bc_module_lcd_get_led_driver(), true);
 
+#if ROTATE_SUPPORT
     // Initialize Accelerometer
     bc_dice_init(&dice, BC_DICE_FACE_UNKNOWN);
     bc_lis2dh12_init(&lis2dh12, BC_I2C_I2C0, 0x19);
     bc_lis2dh12_set_update_interval(&lis2dh12, 5 * 1000);
     bc_lis2dh12_set_event_handler(&lis2dh12, lis2dh12_event_handler, NULL);
+#endif
 
     bc_radio_pairing_request("kit-lcd-thermostat", VERSION);
 
@@ -271,7 +287,9 @@ void application_task(void)
 
     bc_system_pll_enable();
 
+#if ROTATE_SUPPORT
     bc_module_lcd_set_rotation(rotation);
+#endif
 
     bc_module_lcd_clear();
 

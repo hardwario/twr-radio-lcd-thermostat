@@ -5,6 +5,10 @@
 #define VERSION "vdev"
 #endif
 
+#ifndef ROTATE_SUPPORT
+#define ROTATE_SUPPORT 0
+#endif
+
 #include <bcl.h>
 
 typedef struct
