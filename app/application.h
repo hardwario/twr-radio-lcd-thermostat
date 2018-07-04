@@ -9,6 +9,10 @@
 #define ROTATE_SUPPORT 0
 #endif
 
+#ifndef CORE_R
+#define CORE_R 1
+#endif
+
 #include <bcl.h>
 
 typedef struct

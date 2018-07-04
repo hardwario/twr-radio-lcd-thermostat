@@ -36,6 +36,24 @@ bc_dice_face_t face = BC_DICE_FACE_UNKNOWN;
 bc_module_lcd_rotation_t rotation = BC_MODULE_LCD_ROTATION_0;
 #endif
 
+#if CORE_R == 2
+bc_module_lcd_rotation_t face_2_lcd_rotation_lut[7] =
+{
+    [BC_DICE_FACE_2] = BC_MODULE_LCD_ROTATION_270,
+    [BC_DICE_FACE_3] = BC_MODULE_LCD_ROTATION_180,
+    [BC_DICE_FACE_4] = BC_MODULE_LCD_ROTATION_0,
+    [BC_DICE_FACE_5] = BC_MODULE_LCD_ROTATION_90
+};
+#else
+bc_module_lcd_rotation_t face_2_lcd_rotation_lut[7] =
+{
+    [BC_DICE_FACE_2] = BC_MODULE_LCD_ROTATION_90,
+    [BC_DICE_FACE_3] = BC_MODULE_LCD_ROTATION_0,
+    [BC_DICE_FACE_4] = BC_MODULE_LCD_ROTATION_180,
+    [BC_DICE_FACE_5] = BC_MODULE_LCD_ROTATION_270
+};
+#endif
+
 void radio_pub_set_temperature(void)
 {
     temperature_set_point.next_pub = bc_scheduler_get_spin_tick() + SET_TEMPERATURE_PUB_INTERVAL;
@@ -149,40 +167,11 @@ void lis2dh12_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void
 
         bc_dice_feed_vectors(&dice, result.x_axis, result.y_axis, result.z_axis);
 
-        if (face != bc_dice_get_face(&dice))
-        {
-            face = bc_dice_get_face(&dice);
+        face = bc_dice_get_face(&dice);
 
-            switch (face)
-            {
-                case BC_DICE_FACE_2:
-                {
-                    rotation = BC_MODULE_LCD_ROTATION_90;
-                    break;
-                }
-                case BC_DICE_FACE_3:
-                {
-                    rotation = BC_MODULE_LCD_ROTATION_0;
-                    break;
-                }
-                case BC_DICE_FACE_4:
-                {
-                    rotation = BC_MODULE_LCD_ROTATION_180;
-                    break;
-                }
-                case BC_DICE_FACE_5:
-                {
-                    rotation = BC_MODULE_LCD_ROTATION_270;
-                    break;
-                }
-                case BC_DICE_FACE_1:
-                case BC_DICE_FACE_6:
-                case BC_DICE_FACE_UNKNOWN:
-                default:
-                {
-                    break;
-                }
-            }
+        if (face > BC_DICE_FACE_1 && face < BC_DICE_FACE_6)
+        {
+            rotation = face_2_lcd_rotation_lut[face];
 
             bc_scheduler_plan_now(APPLICATION_TASK_ID);
         }

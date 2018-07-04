@@ -11,7 +11,16 @@ This repository contains firmware for Thermostat Kit
 
 ## Build
 
-For build with LCD rotation support use this commands
+For build use this commands
+
+        make
+
+For build with LCD rotation support use this commands for core R2.x
+
+        make clean
+        make -j4 ROTATE_SUPPORT=1 CORE_R=2
+
+For build with LCD rotation support use this commands for core R1.3
 
         make clean
         make -j4 ROTATE_SUPPORT=1
