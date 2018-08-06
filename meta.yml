@@ -1,0 +1,5 @@
+article: https://www.bigclown.com/doc/projects/wireless-lcd-thermostat/
+assembly:
+  - name: BigClown LCD Module
+  - name: BigClown Core Module
+  - name: BigClown Mini Battery Module
