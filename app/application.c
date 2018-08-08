@@ -181,16 +181,17 @@ void lis2dh12_event_handler(bc_lis2dh12_t *self, bc_lis2dh12_event_t event, void
 
 void battery_event_handler(bc_module_battery_event_t event, void *event_param)
 {
-    (void) event;
     (void) event_param;
 
     float voltage;
 
-    if (bc_module_battery_get_voltage(&voltage))
+    if (event == BC_MODULE_BATTERY_EVENT_UPDATE)
     {
-        bc_radio_pub_battery(&voltage);
+        if (bc_module_battery_get_voltage(&voltage))
+        {
+            bc_radio_pub_battery(&voltage);
+        }
     }
-
 }
 
 void switch_to_normal_mode_task(void *param)
@@ -258,7 +259,7 @@ void application_init(void)
     bc_lis2dh12_set_event_handler(&lis2dh12, lis2dh12_event_handler, NULL);
 #endif
 
-    bc_radio_pairing_request("kit-lcd-thermostat", VERSION);
+    bc_radio_pairing_request("lcd-thermostat", VERSION);
 
     bc_scheduler_register(switch_to_normal_mode_task, NULL, SERVICE_INTERVAL_INTERVAL);
 
