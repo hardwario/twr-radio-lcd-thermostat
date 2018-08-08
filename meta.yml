@@ -1,4 +1,7 @@
-article: https://www.bigclown.com/doc/projects/wireless-lcd-thermostat/
+article: https://www.bigclown.com/doc/projects/radio-lcd-thermostat/
+images:
+  - title:
+    url: https://www.bigclown.com/kits/lcd-thermostat/main.png
 assembly:
   - name: BigClown LCD Module
   - name: BigClown Core Module
