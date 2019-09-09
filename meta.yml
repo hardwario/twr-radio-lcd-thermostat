@@ -2,6 +2,12 @@ article: https://www.bigclown.com/doc/projects/radio-lcd-thermostat/
 images:
   - title:
     url: https://www.bigclown.com/kits/lcd-thermostat/main.png
+articles:
+  - title: Heating Control with BigClown Thermostat
+    url: https://www.hackster.io/jakub-smejkal/heating-control-with-bigclown-thermostat-4ec1fc
+    description: Control your heating with this simple device that is easy to modify. You can control your sunblinds or boiler for optimal temperature.
+    images:
+      - url: https://hackster.imgix.net/uploads/attachments/929940/lcd_thermostat_jW0FMPqlL4.png?auto=compress%2Cformat&w=900&h=675&fit=min
 assembly:
   - name: BigClown LCD Module
   - name: BigClown Core Module
