@@ -256,7 +256,7 @@ void application_init(void)
     twr_lis2dh12_set_event_handler(&lis2dh12, lis2dh12_event_handler, NULL);
 #endif
 
-    twr_radio_pairing_request("lcd-thermostat", VERSION);
+    twr_radio_pairing_request("lcd-thermostat", FW_VERSION);
 
     twr_scheduler_register(switch_to_normal_mode_task, NULL, SERVICE_INTERVAL_INTERVAL);
 

@@ -1,10 +1,6 @@
 #ifndef _APPLICATION_H
 #define _APPLICATION_H
 
-#ifndef VERSION
-#define VERSION "vdev"
-#endif
-
 #ifndef ROTATE_SUPPORT
 #define ROTATE_SUPPORT 0
 #endif
@@ -15,7 +11,6 @@
 
 #include <bcl.h>
 #include <twr.h>
-
 
 typedef struct
 {
